@@ -3,7 +3,6 @@ import matplotlib.mlab as mlab
 from mpl_toolkits.mplot3d import Axes3D
 import math
 import numpy as np
-from GaussianGate import GaussianGate
 from pylab import *
 from scipy.stats import multivariate_normal
 
