@@ -232,15 +232,15 @@ class MixtureOfExperts:
 
     def visualizePredictions(self, training_x, training_y, test_x, test_y):
         #Input 1 or 2 D. Output 1 D.
-        assert (training_x.shape[1] == 1 or training_x.shape[1] == 2) and training_y.shape[1] == 1, \
-            "Invalid Dimensions for Plotting Results - Input: %d - Output: %d" %(training_x.shape[1], training_y.shape[1])
+        assert (training_x.shape[1] == 1 or training_x.shape[1] == 2), \
+            "Invalid Dimensions for Plotting Results - Input: %d" %(training_x.shape[1])
 
         plotter = Plotter()
         plotter.plotPrediction(self, training_x, training_y, self.norm_test_x, self.norm_test_y)
         plotter.plotExpertsPrediction(self, test_x, test_y)
         plotter.plotExpertsCenters(self, training_x, training_y)
         plotter.plotGaussians(self, training_x, training_y)
-
+       
 
 
 

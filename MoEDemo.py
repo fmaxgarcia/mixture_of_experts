@@ -42,6 +42,23 @@ def createData():
     #function3(data)
     return np.asarray(data), np.asarray(out)
 
+def createData2():
+    data1 = list(); data2 = list()
+    [data1.append(random.uniform(0, 5)) for i in range(100)]
+    [data2.append(random.uniform(5,10)) for i in range(100)]
+
+    data = list()
+    data.extend(data1); data.extend(data2)
+
+    out1 = function3(data); out2 = function2(data)
+    out = list()
+    for i in range(len(data)):
+        out.append( (out1[i], out2[i]) )
+
+    #function3(data)
+    return np.asarray(data), np.asarray(out)
+
+
 def function2D(x, y):
     out = list()
     for i in range(len(x)):
@@ -50,6 +67,16 @@ def function2D(x, y):
 
         out.append( math.log(zx + zy) )
     return out
+
+def function2D2(x, y):
+    out = list()
+    for i in range(len(x)):
+        zx = 2*(x[i]-5)**2 + 50
+        zy = 2*(y[i]-5)**2 + 50
+
+        out.append( math.log(zx + zy) )
+    return out
+
 
 def createData2D():
     data1, data2 = [], []
@@ -61,7 +88,30 @@ def createData2D():
         data.append( (data1[i], data2[i]) )
 
     out = function2D(data1, data2)
+
     return np.asarray(data), np.asarray(out)
+
+
+def createData2D2():
+    data1, data2 = [], []
+    [data1.append(random.uniform(0,10)) for i in range(200)]
+    [data2.append(random.uniform(0,10)) for i in range(200)]
+
+    data = list()
+    for i in range(len(data1)):
+        data.append( (data1[i], data2[i]) )
+
+    out1 = function2D(data1, data2)
+    out2 = function2D2(data1, data2)
+
+    out = list()
+    for i in range(len(data1)):
+        out.append( (out1[i], out2[i]) )
+
+
+    return np.asarray(data), np.asarray(out)
+
+
 
 
 def readFile(filename):
@@ -109,7 +159,7 @@ if __name__ == '__main__':
 
     (options, args) = parser.parse_args()
 
-    data, out = createData2D() if options.train is None else readFile(options.train)
+    data, out = createData2() if options.train is None else readFile(options.train)
 
     num_experts = 2 if options.num is None else options.num
     maxIterations = 100 if options.iter is None else options.iter
@@ -144,6 +194,6 @@ if __name__ == '__main__':
     mixExperts = MixtureOfExperts(num_experts, training_x, training_y, test_x, test_y, poly_degree=1, feat_type="polynomial")
 
     #Train network and returns intermediate states for vizualisation
-    mixExperts.trainNetwork(maxIterations, growing=True)
+    mixExperts.trainNetwork(maxIterations, growing=False)
     mixExperts.setToBestParams()
     mixExperts.visualizePredictions(training_x, training_y, test_x, test_y)

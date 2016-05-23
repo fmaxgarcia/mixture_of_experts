@@ -8,7 +8,7 @@ from scipy.stats import multivariate_normal
 
 class Plotter:
 
-    def _create3Dmesh(self, x, y, mixtureOfExperts):
+    def _create3Dmesh(self, x, y, mixtureOfExperts, output_index):
         xdata = sorted(x)
         ydata = sorted(y, reverse=True)
         X, Y = np.meshgrid(xdata, ydata)
@@ -17,62 +17,71 @@ class Plotter:
             for j in range(X.shape[0]):
                 xy = mixtureOfExperts.transform_features(np.asarray([X[i][j], Y[i][j]]))
                 finalOutput, expertsOutputs = mixtureOfExperts.computeMixtureOutput( xy )
+                if output_index > -1:
+                    finalOutput = finalOutput[output_index]
                 Z[i][j] = finalOutput
 
         return  X, Y, Z
 
 
     def plotPrediction(self, mixtureOfExperts, training_x, training_y, test_x, test_y):
-        error, prediction = mixtureOfExperts.testMixture(test_x, test_y)
-        figure = plt.figure()
-        three_d = False if training_x.shape[1] == 1 else True
-        plot1 = figure.add_subplot(111, projection='3d') if three_d else figure.add_subplot(111)
-        cmap = colormaps()
+        num_outputs = 1 if len(training_y.shape) == 1 else training_y.shape[1]
 
-        if three_d:
-            xt, yt, zt = self._create3Dmesh(test_x[:,0], test_x[:,1], mixtureOfExperts)
-            plot1.plot_surface(xt, yt, zt, cmap=cmap[7])
-        else:
-            plot1.scatter(training_x[:,0], training_y, c="red")
+        for i in range(num_outputs):
+            error, prediction = mixtureOfExperts.testMixture(test_x, test_y)
+            figure = plt.figure()
+            three_d = False if training_x.shape[1] == 1 else True
+            plot1 = figure.add_subplot(111, projection='3d') if three_d else figure.add_subplot(111)
+            cmap = colormaps()
 
-        string = "Error = %f" %(error)
-        ax = plot1.axis()
-        x_range = ax[1] - ax[0]
-        y_range = ax[3] - ax[2]
-        if three_d:
-            plot1.text(ax[0] + (x_range / 10), ax[3] - (y_range / 10), 0, string, fontsize = 12)
-        else:
-            plot1.text(ax[0] + (x_range / 10), ax[3] - (y_range / 10), string, fontsize = 12)
+            index = i if num_outputs > 1 else -1
+            if three_d:
+                xt, yt, zt = self._create3Dmesh(test_x[:,0], test_x[:,1], mixtureOfExperts, output_index=index)
+                plot1.plot_surface(xt, yt, zt, cmap=cmap[7])
+            else:
+                plot1.scatter(training_x[:,0], training_y[:,i], c="red")
 
-        plt.show()
+            string = "Error = %f" %(error) if type(error) is float else "Error = %f" %(error[i])
+            ax = plot1.axis()
+            x_range = ax[1] - ax[0]
+            y_range = ax[3] - ax[2]
+            if three_d:
+                plot1.text(ax[0] + (x_range / 10), ax[3] - (y_range / 10), 0, string, fontsize = 12)
+            else:
+                plot1.text(ax[0] + (x_range / 10), ax[3] - (y_range / 10), string, fontsize = 12)
+
+            plt.show()
 
 
 
     def plotExpertsPrediction(self, mixtureOfExperts, test_x, test_y):
-        predictions, y = [], []
         three_d = test_x.shape[1] != 1
         if three_d == False:
-            for e in mixtureOfExperts.experts:
-                predictions.append( list() )
+            num_outputs = 1 if len(test_y.shape) == 1 else test_y.shape[1]
 
-            for x in test_x:
-                x = mixtureOfExperts.transform_features(x)
-                y.append( mixtureOfExperts.computeMixtureOutput(x)[0] )
+            for i in range(num_outputs):
+                predictions, y = [], []
+                for e in mixtureOfExperts.experts:
+                    predictions.append( list() )
 
-                yhats = mixtureOfExperts.computeExpertsOutputs(x)
-                for i in range(len(mixtureOfExperts.experts)):
-                    predictions[i].append( yhats[0][i] )
+                for x in test_x:
+                    x = mixtureOfExperts.transform_features(x)
+                    finalOutput, expertsOutputs = mixtureOfExperts.computeMixtureOutput(x)
+                    y.append( finalOutput[i] )
 
-            plt.subplot(121)
-            for i in range(len(predictions)):
-                line, = plt.plot(test_y[:,0], predictions[i])
-                line.set_label("Expert %d" %(i))
+                    for j in range(len(mixtureOfExperts.experts)):
+                        predictions[j].append( expertsOutputs[j,i] )
 
-            xs = test_y[:,0]
-            line, = plt.plot(xs, y, 'ro')
-            line.set_label("Overall Output")
-            plt.legend(bbox_to_anchor=(1.05, 1), loc=2)
-            plt.show()
+                plt.subplot(121)
+                for k in range(len(predictions)):
+                    line, = plt.plot(test_x[:,0], predictions[k])
+                    line.set_label("Expert %d" %(k))
+
+                xs = test_x[:,0]
+                line, = plt.plot(xs, y, 'ro')
+                line.set_label("Overall Output")
+                plt.legend(bbox_to_anchor=(1.05, 1), loc=2)
+                plt.show()
 
 
 
