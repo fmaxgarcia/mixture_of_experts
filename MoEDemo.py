@@ -146,4 +146,4 @@ if __name__ == '__main__':
     #Train network and returns intermediate states for vizualisation
     mixExperts.trainNetwork(maxIterations, growing=False)
     mixExperts.setToBestParams()
-    # mixExperts.visualizePredictions(training_x, training_y, test_x, test_y, originalFunction=function2Dcompare)
+    mixExperts.visualizePredictions(training_x, training_y, test_x, test_y)

@@ -5,7 +5,7 @@ import math
 import numpy as np
 from GaussianGate import GaussianGate
 from pylab import *
-#from scipy.stats import multivariate_normal
+from scipy.stats import multivariate_normal
 
 class Plotter:
 
@@ -23,7 +23,7 @@ class Plotter:
         return  X, Y, Z
 
 
-    def plotPrediction(self, mixtureOfExperts, training_x, training_y, test_x, test_y, originalFunction=None):
+    def plotPrediction(self, mixtureOfExperts, training_x, training_y, test_x, test_y):
         error, prediction = mixtureOfExperts.testMixture(test_x, test_y)
         figure = plt.figure()
         three_d = False if training_x.shape[1] == 1 else True
@@ -31,52 +31,49 @@ class Plotter:
         cmap = colormaps()
 
         if three_d:
-            xdat = sorted(training_x[:,0])
-            ydat = sorted(training_x[:,1], reverse=True)
-            X, Y = np.meshgrid(xdat, ydat)
-
             xt, yt, zt = self._create3Dmesh(test_x[:,0], test_x[:,1], mixtureOfExperts)
             plot1.plot_surface(xt, yt, zt, cmap=cmap[7])
         else:
             plot1.scatter(training_x[:,0], training_y, c="red")
-            plot2.scatter(test_x[:,0], prediction, c='blue')
 
         string = "Error = %f" %(error)
-        ax = plot2.axis()
+        ax = plot1.axis()
         x_range = ax[1] - ax[0]
         y_range = ax[3] - ax[2]
         if three_d:
-            plot2.text(ax[0] + (x_range / 10), ax[3] - (y_range / 10), 0, string, fontsize = 12)
+            plot1.text(ax[0] + (x_range / 10), ax[3] - (y_range / 10), 0, string, fontsize = 12)
         else:
-            plot2.text(ax[0] + (x_range / 10), ax[3] - (y_range / 10), string, fontsize = 12)
+            plot1.text(ax[0] + (x_range / 10), ax[3] - (y_range / 10), string, fontsize = 12)
 
         plt.show()
 
 
 
-    def plotExpertsPrediction(self, mixtureOfExperts, testdata, testoutput):
+    def plotExpertsPrediction(self, mixtureOfExperts, test_x, test_y):
         predictions, y = [], []
-        for e in mixtureOfExperts.experts:
-            predictions.append( list() )
+        three_d = test_x.shape[1] != 1
+        if three_d == False:
+            for e in mixtureOfExperts.experts:
+                predictions.append( list() )
 
-        for x in testdata:
-            x = mixtureOfExperts.transform_features(x)
-            y.append( mixtureOfExperts.computeMixtureOutput(x)[0] )
+            for x in test_x:
+                x = mixtureOfExperts.transform_features(x)
+                y.append( mixtureOfExperts.computeMixtureOutput(x)[0] )
 
-            yhats = mixtureOfExperts.computeExpertsOutputs(x)
-            for i in range(len(mixtureOfExperts.experts)):
-                predictions[i].append( yhats[0][i] )
+                yhats = mixtureOfExperts.computeExpertsOutputs(x)
+                for i in range(len(mixtureOfExperts.experts)):
+                    predictions[i].append( yhats[0][i] )
 
-        plt.subplot(121)
-        for i in range(len(predictions)):
-            line, = plt.plot(testdata[:,0], predictions[i])
-            line.set_label("Expert %d" %(i))
+            plt.subplot(121)
+            for i in range(len(predictions)):
+                line, = plt.plot(test_y[:,0], predictions[i])
+                line.set_label("Expert %d" %(i))
 
-        xs = testdata[:,0]
-        line, = plt.plot(xs, y, 'ro')
-        line.set_label("Overall Output")
-        plt.legend(bbox_to_anchor=(1.05, 1), loc=2)
-        plt.show()
+            xs = test_y[:,0]
+            line, = plt.plot(xs, y, 'ro')
+            line.set_label("Overall Output")
+            plt.legend(bbox_to_anchor=(1.05, 1), loc=2)
+            plt.show()
 
 
 
@@ -90,7 +87,7 @@ class Plotter:
             labels = list()
             for i in range(len(mixtureOfExperts.experts)):
                 expertMean = mixtureOfExperts.experts[i].location
-                means[i] = expertMean
+                means[i] = expertMean.T
                 plot1.scatter(expertMean[1], expertMean[2], c="red")
                 labels.append("Expert %d center" %(i))
 
@@ -117,37 +114,37 @@ class Plotter:
         plt.show()
 
     def plotGaussians(self, mixtureOfExperts, trainingdata, trainingoutput):
-        if (isinstance(mixtureOfExperts.gateNet, GaussianGate)):
-            three_d = False if trainingdata.shape[1] == 1 else True
-            if three_d:
-                figure = plt.figure()
-                stepfirst = (max(trainingdata[:,0]) - min(trainingdata[:,0])) / 100.0
-                stepsecond = (max(trainingdata[:,1]) - min(trainingdata[:,1])) / 100.0
-                x, y = np.mgrid[min(trainingdata[:,0]):max(trainingdata[:,0]):stepfirst, min(trainingdata[:,1]):max(trainingdata[:,1]):stepsecond]
-                pos = np.empty(x.shape + (2,))
-                pos[:, :, 0] = x; pos[:, :, 1] = y
-                ax2 = figure.add_subplot(111)
-                for i, expert in enumerate(mixtureOfExperts.experts):
-                    rv = multivariate_normal(expert.location[1:], mixtureOfExperts.gateNet.sigma[i,1:,1:])
-                    ax2.contourf(x, y, rv.pdf(pos),alpha=0.2)
-            else:
-                figure = plt.figure()
-                plot1 = figure.add_subplot(121)
-                min_out = min(trainingoutput)
-                max_out = max(trainingoutput)
-                trainingoutput = [(x - min_out) / (max_out- min_out) for x in trainingoutput]
+        three_d = False if trainingdata.shape[1] == 1 else True
+        if three_d:
+            figure = plt.figure()
+            stepfirst = (max(trainingdata[:,0]) - min(trainingdata[:,0])) / 100.0
+            stepsecond = (max(trainingdata[:,1]) - min(trainingdata[:,1])) / 100.0
+            x, y = np.mgrid[min(trainingdata[:,0]):max(trainingdata[:,0]):stepfirst, min(trainingdata[:,1]):max(trainingdata[:,1]):stepsecond]
+            pos = np.empty(x.shape + (2,))
+            pos[:, :, 0] = x; pos[:, :, 1] = y
+            ax2 = figure.add_subplot(111)
+            for i, expert in enumerate(mixtureOfExperts.experts):
+                mean = expert.location[1:].reshape(2,)
+                rv = multivariate_normal(mean, mixtureOfExperts.gateNet.sigma[i,1:,1:])
+                ax2.contourf(x, y, rv.pdf(pos),alpha=0.2)
+        else:
+            figure = plt.figure()
+            plot1 = figure.add_subplot(121)
+            min_out = min(trainingoutput)
+            max_out = max(trainingoutput)
+            trainingoutput = [(x - min_out) / (max_out- min_out) for x in trainingoutput]
 
-                plot1.scatter(trainingdata[:,0], trainingoutput, c="red")
-                ax = plot1.axis()
-                xs = np.linspace(ax[0], ax[1], 100)
-                for i in range(len(mixtureOfExperts.experts)):
-                    mean = mixtureOfExperts.experts[i].mean()[1]
-                    sigma = math.sqrt( mixtureOfExperts.gateNet.sigma[i][1][1] )
-                    line, = plot1.plot(xs, mixtureOfExperts.gateNet.alphas[i] * mlab.normpdf(xs, mean, sigma))
-                    line.set_label("Expert %d gaussian" %(i))
+            plot1.scatter(trainingdata[:,0], trainingoutput, c="red")
+            ax = plot1.axis()
+            xs = np.linspace(ax[0], ax[1], 100)
+            for i in range(len(mixtureOfExperts.experts)):
+                mean = mixtureOfExperts.experts[i].mean()[0,1]
+                sigma = math.sqrt( mixtureOfExperts.gateNet.sigma[i][1][1] )
+                line, = plot1.plot(xs, mixtureOfExperts.gateNet.alphas[i] * mlab.normpdf(xs, mean, sigma))
+                line.set_label("Expert %d gaussian" %(i))
 
-                plt.legend(bbox_to_anchor=(1.05, 1), loc=2)
-            plt.show()
+            plt.legend(bbox_to_anchor=(1.05, 1), loc=2)
+        plt.show()
 
 
 

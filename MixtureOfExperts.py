@@ -230,9 +230,9 @@ class MixtureOfExperts:
 
 
 
-    def visualizePredictions(self, training_x, training_y, test_x, test_y, originalFunction=None):
+    def visualizePredictions(self, training_x, training_y, test_x, test_y):
         plotter = Plotter()
-        plotter.plotPrediction(self, training_x, training_y, self.norm_test_x, self.norm_test_y, originalFunction)
+        plotter.plotPrediction(self, training_x, training_y, self.norm_test_x, self.norm_test_y)
         plotter.plotExpertsPrediction(self, test_x, test_y)
         plotter.plotExpertsCenters(self, training_x, training_y)
         plotter.plotGaussians(self, training_x, training_y)
