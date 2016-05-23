@@ -85,74 +85,76 @@ class Plotter:
 
 
 
-    def plotExpertsCenters(self, mixtureOfExperts, trainingdata, trainingoutput):
-        figure = plt.figure()
-        three_d = False if trainingdata.shape[1] == 1 else True
-        means = np.zeros( (len(mixtureOfExperts.experts), mixtureOfExperts.experts[0].location.shape[0]) )
-
-        if three_d:
-            plot1 = figure.add_subplot(111)
-            labels = list()
-            for i in range(len(mixtureOfExperts.experts)):
-                expertMean = mixtureOfExperts.experts[i].location
-                means[i] = expertMean.T
-                plot1.scatter(expertMean[1], expertMean[2], c="red")
-                labels.append("Expert %d center" %(i))
-
-            for label, x, y in zip(labels, means[:, 1], means[:, 2]):
-                plt.annotate(
-                label,
-                xy = (x, y), xytext = (-20, 20),
-                textcoords = 'offset points', ha = 'right', va = 'bottom',
-                bbox = dict(boxstyle = 'round,pad=0.5', fc = 'yellow', alpha = 0.5),
-                arrowprops = dict(arrowstyle = '->', connectionstyle = 'arc3,rad=0'))
-
-        else:
-            plot1 = figure.add_subplot(121)
-            ax = plot1.axis()
-            plot1.scatter(trainingdata[:,0], trainingoutput, c="red")
-            ys = np.linspace(min(trainingoutput), max(trainingoutput), num=50)
-
-            for i in range(len(mixtureOfExperts.experts)):
-                expertMean = [ mixtureOfExperts.experts[i].location[1] ] * 50
-                line, = plot1.plot(expertMean, ys)
-                line.set_label("Expert %d center" %(i))
-
-        plt.legend(bbox_to_anchor=(1.05, 1), loc=2)
-        plt.show()
-
-    def plotGaussians(self, mixtureOfExperts, trainingdata, trainingoutput):
-        three_d = False if trainingdata.shape[1] == 1 else True
-        if three_d:
+    def plotExpertsCenters(self, mixtureOfExperts, training_x, training_y):
+        num_outputs = 1 if len(training_y.shape) == 1 else training_y.shape[1]
+        for j in range(num_outputs):
+            
             figure = plt.figure()
-            stepfirst = (max(trainingdata[:,0]) - min(trainingdata[:,0])) / 100.0
-            stepsecond = (max(trainingdata[:,1]) - min(trainingdata[:,1])) / 100.0
-            x, y = np.mgrid[min(trainingdata[:,0]):max(trainingdata[:,0]):stepfirst, min(trainingdata[:,1]):max(trainingdata[:,1]):stepsecond]
-            pos = np.empty(x.shape + (2,))
-            pos[:, :, 0] = x; pos[:, :, 1] = y
-            ax2 = figure.add_subplot(111)
-            for i, expert in enumerate(mixtureOfExperts.experts):
-                mean = expert.location[1:].reshape(2,)
-                rv = multivariate_normal(mean, mixtureOfExperts.gateNet.sigma[i,1:,1:])
-                ax2.contourf(x, y, rv.pdf(pos),alpha=0.2)
-        else:
-            figure = plt.figure()
-            plot1 = figure.add_subplot(121)
-            min_out = min(trainingoutput)
-            max_out = max(trainingoutput)
-            trainingoutput = [(x - min_out) / (max_out- min_out) for x in trainingoutput]
+            three_d = False if training_x.shape[1] == 1 else True
+            means = np.zeros( (len(mixtureOfExperts.experts), mixtureOfExperts.experts[0].location.shape[0]) )
+            if three_d:
+                plot1 = figure.add_subplot(111)
+                labels = list()
+                for i in range(len(mixtureOfExperts.experts)):
+                    expertMean = mixtureOfExperts.experts[i].location
+                    means[i] = expertMean.T
+                    plot1.scatter(expertMean[1], expertMean[2], c="red")
+                    labels.append("Expert %d center" %(i))
 
-            plot1.scatter(trainingdata[:,0], trainingoutput, c="red")
-            ax = plot1.axis()
-            xs = np.linspace(ax[0], ax[1], 100)
-            for i in range(len(mixtureOfExperts.experts)):
-                mean = mixtureOfExperts.experts[i].mean()[0,1]
-                sigma = math.sqrt( mixtureOfExperts.gateNet.sigma[i][1][1] )
-                line, = plot1.plot(xs, mixtureOfExperts.gateNet.alphas[i] * mlab.normpdf(xs, mean, sigma))
-                line.set_label("Expert %d gaussian" %(i))
+                for label, x, y in zip(labels, means[:, 1], means[:, 2]):
+                    plt.annotate(
+                    label,
+                    xy = (x, y), xytext = (-20, 20),
+                    textcoords = 'offset points', ha = 'right', va = 'bottom',
+                    bbox = dict(boxstyle = 'round,pad=0.5', fc = 'yellow', alpha = 0.5),
+                    arrowprops = dict(arrowstyle = '->', connectionstyle = 'arc3,rad=0'))
+
+            else:
+                plot1 = figure.add_subplot(121)
+                ax = plot1.axis()
+                plot1.scatter(training_x[:,0], training_y[:,j], c="red")
+                ys = np.linspace(min(training_y[:,j]), max(training_y[:,j]), num=50)
+
+                for i in range(len(mixtureOfExperts.experts)):
+                    expertMean = [ mixtureOfExperts.experts[i].location[1] ] * 50
+                    line, = plot1.plot(expertMean, ys)
+                    line.set_label("Expert %d center" %(i))
 
             plt.legend(bbox_to_anchor=(1.05, 1), loc=2)
-        plt.show()
+            plt.show()
+
+    def plotGaussians(self, mixtureOfExperts, training_x, training_y):
+        three_d = False if training_x.shape[1] == 1 else True
+        num_outputs = 1 if len(training_y.shape) == 1 else training_y.shape[1]
+        for j in range(num_outputs):
+       
+            if three_d:
+                figure = plt.figure()
+                stepfirst = (max(training_x[:,0]) - min(training_x[:,0])) / 100.0
+                stepsecond = (max(training_x[:,1]) - min(training_x[:,1])) / 100.0
+                x, y = np.mgrid[min(training_x[:,0]):max(training_x[:,0]):stepfirst, min(training_x[:,1]):max(training_x[:,1]):stepsecond]
+                pos = np.empty(x.shape + (2,))
+                pos[:, :, 0] = x; pos[:, :, 1] = y
+                ax2 = figure.add_subplot(111)
+                for i, expert in enumerate(mixtureOfExperts.experts):
+                    mean = expert.location[1:].reshape(2,)
+                    rv = multivariate_normal(mean, mixtureOfExperts.gateNet.sigma[i,1:,1:])
+                    ax2.contourf(x, y, rv.pdf(pos),alpha=0.2)
+            else:
+                figure = plt.figure()
+                plot1 = figure.add_subplot(121)
+
+                plot1.scatter(training_x[:,0], training_y[:,j], c="red")
+                ax = plot1.axis()
+                xs = np.linspace(ax[0], ax[1], 100)
+                for i in range(len(mixtureOfExperts.experts)):
+                    mean = mixtureOfExperts.experts[i].mean()[0,1]
+                    sigma = math.sqrt( mixtureOfExperts.gateNet.sigma[i][1][1] )
+                    line, = plot1.plot(xs, mixtureOfExperts.gateNet.alphas[i] * mlab.normpdf(xs, mean, sigma))
+                    line.set_label("Expert %d gaussian" %(i))
+
+                plt.legend(bbox_to_anchor=(1.05, 1), loc=2)
+            plt.show()
 
 
 
