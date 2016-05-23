@@ -1,52 +1,14 @@
 import numpy as np
 import math
-from SoftmaxGate import SoftmaxGate
 from GaussianGate import GaussianGate
 from Expert import Expert
 from Plotter import Plotter
 
 from sklearn.preprocessing import PolynomialFeatures
-
-def FourierFeatures(degree, feat):
-    if len(feat.shape) == 1:
-        num_feat = feat.shape[0]
-        new_feat = np.empty( ((degree+1)**num_feat))
-
-        count = np.zeros( (1, num_feat) )
-        feat = feat.reshape( (feat.shape[0], 1) )
-        for i in range(new_feat.shape[0]):
-            new_feat[i] = math.cos(math.pi * count.dot(feat))
-
-            for j in range(count.shape[1]-1, -1, -1):
-                if j == count.shape[1]-1:
-                    count[0,j] += 1
-                elif count[0,j-1] == degree+1:
-                    count[0,j-1] = 0
-                    count[0,j] += 1
-    else:
-        num_feat = feat.shape[1]
-        new_feat = np.empty( (feat.shape[0], (degree+1)**num_feat))
-
-        for j in range(new_feat.shape[0]):
-            count = np.zeros( (1, num_feat) )
-            for i in range(new_feat.shape[1]):
-                feat_j = feat[j].reshape( (feat[j].shape[0], 1) )
-                new_feat[j][i] = math.cos(math.pi * count.dot(feat_j))
-
-                for k in range(count.shape[1]-1, -1, -1):
-                    if k == count.shape[1]-1:
-                        count[0,k] += 1
-                    elif count[0,k-1] == degree+1:
-                        count[0,k-1] = 0
-                        count[0,k] += 1
-    return new_feat
-
-
+from FourierFeatures import FourierFeatures
 
 
 class MixtureOfExperts:
-    learningRate = 0.02
-    decay = 0.98
 
     def _transform_poly_features(self, feat):
         if self.poly_degree > 1:
@@ -58,6 +20,8 @@ class MixtureOfExperts:
                 feat = np.append(ones, feat, 1)
             else:
                 ones = np.ones( (1,) )
+                print feat.shape
+                print feat
                 feat = np.append(ones, feat, 1)
         return feat
 
@@ -73,14 +37,14 @@ class MixtureOfExperts:
             return feat
 
 
-    def __init__(self, num_experts, gateType, mode, training_x, training_y, poly_degree=1, feat_type=None):
+    def __init__(self, num_experts, training_x, training_y, poly_degree=1, feat_type="polynomial"):
         self.poly_degree = poly_degree
         self.feat_type = feat_type
         training_x = self.transform_features(training_x)
 
         dimension_in = training_x.shape[1]
         dimension_out = training_y.shape[1]
-        self.gateNet = SoftmaxGate(num_experts, dimension_in, mode, training_x) if gateType == "softmax" else GaussianGate(num_experts, dimension_in, dimension_out, mode, training_x)
+        self.gateNet = GaussianGate(num_experts, dimension_in, dimension_out, training_x)
         self.training_iterations = 0
         self.experts = list()
         self.numExperts = num_experts
@@ -93,7 +57,7 @@ class MixtureOfExperts:
                 minx = min(training_x[:,j])
                 step = (maxx - minx) / num_experts
                 location[j] = (minx + step/2) + step * i
-            # location = np.random.random( (dimension_in, 1) )
+
             self.experts.append( Expert(dimension_in, dimension_out, location, i) )
 
     def computeExpertsOutputs(self, x):
@@ -162,11 +126,9 @@ class MixtureOfExperts:
             self.experts.append(newExpert)
             ##############################################################################
             #################### Test new network ########################################
-            learningRate = self.learningRate
 
             for i in range(5):
-                self.gateNet.train(training_x, training_y, self.experts, learningRate)
-                learningRate *= 0.9
+                self.gateNet.train(training_x, training_y, self.experts)
                 error, prediction = self.testMixture(test_x, test_y)
                 avg_error = sum(error) / len(error)
                 if  self.bestError - avg_error > 0.0001:
@@ -197,17 +159,15 @@ class MixtureOfExperts:
         [e.saveBestWeights() for e in self.experts]
 
 
-    def trainNetwork(self, training_x, training_y, test_x, test_y, maxIterations):
+    def trainNetwork(self, training_x, training_y, test_x, test_y, maxIterations, growing=False):
         training_x = self.transform_features(training_x)
         errors = list()
         keepGrowing = True
         while keepGrowing:
-            learningRate = self.learningRate
             iterations = 0
             while True:
 
-                self.gateNet.train(training_x, training_y, self.experts, learningRate)
-                learningRate = learningRate * self.decay
+                self.gateNet.train(training_x, training_y, self.experts)
 
                 [e.resetError() for e in self.experts]
                 last_error, prediction = self.testMixture(test_x, test_y, recordErrors=True)
@@ -236,7 +196,7 @@ class MixtureOfExperts:
 
             if self.bestError < 0.0001:
                 break
-            keepGrowing = self.growNetwork(errorSorted, training_x, training_y, test_x, test_y)
+            keepGrowing = False if growing == False else self.growNetwork(errorSorted, training_x, training_y, test_x, test_y)
         print "Final network %d experts" %(len(self.experts))
 
 
@@ -247,15 +207,12 @@ class MixtureOfExperts:
 
 
 
-    def visualizePredictions(self, trainingdata, trainingoutput, testdata, testoutput, visMode):
+    def visualizePredictions(self, trainingdata, trainingoutput, testdata, testoutput):
         plotter = Plotter()
-        if visMode == "rec":
-            plotter.recordTraining(self, trainingdata, trainingoutput, testdata, testoutput)
-        else:
-            plotter.plotPrediction(self, trainingdata, trainingoutput, testdata, testoutput)
-            plotter.plotExpertsPrediction(self, testdata, testoutput)
-            plotter.plotExpertsCenters(self, trainingdata, trainingoutput)
-            plotter.plotGaussians(self, trainingdata, trainingoutput)
+        plotter.plotPrediction(self, trainingdata, trainingoutput, testdata, testoutput)
+        plotter.plotExpertsPrediction(self, testdata, testoutput)
+        plotter.plotExpertsCenters(self, trainingdata, trainingoutput)
+        plotter.plotGaussians(self, trainingdata, trainingoutput)
 
 
 

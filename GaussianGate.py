@@ -1,14 +1,12 @@
-from Gate import *
 import numpy as np
 import math
 from scipy import optimize
 
 
-class GaussianGate(Gate):
-    def __init__(self, num_experts, dimensions_in, dimensions_out, mode, training_x):
+class GaussianGate():
+    def __init__(self, num_experts, dimensions_in, dimensions_out, training_x):
         self.alphas = np.random.random( (num_experts, 1) )
         self.sigma = np.random.random( (num_experts, dimensions_in, dimensions_in) )
-        self.mode = mode
 
         #For visualization only
         self.tracking_alphas = list()
@@ -182,7 +180,7 @@ class GaussianGate(Gate):
         return all_weights
 
 
-    def train(self, training_x, training_y, experts, learningRate):
+    def train(self, training_x, training_y, experts):
 
         new_alphas = self._update_alphas(experts, training_x, training_y)
         new_ms = self._update_ms(experts, training_x, training_y)

@@ -113,29 +113,17 @@ if __name__ == '__main__':
     #Options to run from command line
     usage = "usage: %prog [options] arg"
     parser = OptionParser(usage)
-    parser.add_option("-r", "--rate", action="store", help="learning rate", type="float")
-    parser.add_option("-g", "--gate", action="store", help="gate type [softmax - em]", type="choice", choices=['softmax', 'em'])
     parser.add_option("-n", "--num", action="store", help="number of experts", type="int")
     parser.add_option("-i", "--iter", action="store", help="maximum iterations", type="int")
-    parser.add_option("-d", "--decay", action="store", help="decay rate", type="float")
-    parser.add_option("-m", "--mode", action="store", help="mode [comp - competitive, coop - cooperative]", type="choice", choices=['comp', 'coop'])
     parser.add_option("-t", "--train", action="store", help="train set filename (none for synthetic data)")
     parser.add_option("-v", "--test", action="store", help="test set filename (none for synthetic data)")
-    parser.add_option("-s", "--screen", action="store", help="screen [rec - record movie, screen - screenshot]", type="choice", choices=['rec', 'screen'])
 
     (options, args) = parser.parse_args()
-
-    mode = "coop" if options.mode is None else options.mode
-    gateType = "softmax" if options.gate is None else options.gate
-    print "Running in mode: ", mode
 
     data, out = createData2D() if options.train is None else readFile(options.train)
 
     num_experts = 2 if options.num is None else options.num
     maxIterations = 100 if options.iter is None else options.iter
-    learningRate = 0.01 if options.rate is None else options.rate
-    decay = 0.98 if options.decay is None else options.decay
-    rec = "screen" if options.screen is None else options.screen
 
 
     #Initialize and format training data
@@ -169,12 +157,10 @@ if __name__ == '__main__':
     #######################################################
 
     #Create mix of experts and set up hyper-params
-    mixExperts = MixtureOfExperts(num_experts, gateType, mode, training_x, training_y, poly_degree=1, feat_type="polynomial")
-    mixExperts.learningRate = learningRate
-    mixExperts.decay = decay
+    mixExperts = MixtureOfExperts(num_experts, training_x, training_y, poly_degree=1, feat_type="polynomial")
 
     #Train network and returns intermediate states for vizualisation
-    mixExperts.trainNetwork(training_x, training_y, testdata, actualOutput, maxIterations)
+    mixExperts.trainNetwork(training_x, training_y, testdata, actualOutput, maxIterations, growing=False)
 
     mixExperts.setToBestParams()
-    mixExperts.visualizePredictions(training_x, training_y, testdata, actualOutput, rec)
+    mixExperts.visualizePredictions(training_x, training_y, testdata, actualOutput)

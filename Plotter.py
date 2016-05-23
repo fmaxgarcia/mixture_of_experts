@@ -2,9 +2,7 @@ import matplotlib.pyplot as plt
 import matplotlib.mlab as mlab
 from mpl_toolkits.mplot3d import Axes3D
 import math
-from viztricks import FigureSaver
 import numpy as np
-from SoftmaxGate import SoftmaxGate
 from GaussianGate import GaussianGate
 from pylab import *
 #from scipy.stats import multivariate_normal
@@ -62,41 +60,7 @@ class Plotter:
 
         plt.show()
 
-    def recordTraining(self, mixtureOfExperts, trainingdata, trainingoutput, testdata, testoutput):    
-        with FigureSaver(name="capture", mode='gif', fps=5):
-            for iteration in range(mixtureOfExperts.training_iterations):
-                mixtureOfExperts.gateNet.setIterationValues(iteration, mixtureOfExperts.experts)
 
-                error, prediction = mixtureOfExperts.testMixture(testdata, testoutput)
-                figure = plt.figure()
-                three_d = False if trainingdata.shape[1] == 2 else True
-                plot1 = figure.add_subplot(111, projection='3d') if three_d else figure.add_subplot(111)
-                cmap = colormaps()
-
-                if three_d:
-                    xdat = sorted(trainingdata[:,0])
-                    ydat = sorted(trainingdata[:,1], reverse=True)
-                    X, Y = np.meshgrid(xdat, ydat)
-                    Z = np.log((-2*(X-5)**2 + 50) + (-2*(Y-5)**2 + 50))
-                    plot1.plot_surface(X, Y, Z, cmap=cmap[3])
-
-                    xt, yt, zt = self._create3Dmesh(testdata[:,1], testdata[:,2], mixtureOfExperts)
-                    plot1.plot_surface(xt, yt, zt, cmap=cmap[7])
-                else:
-                    plot1.scatter(trainingdata[:,0], trainingoutput, c="red")
-                    plot1.scatter(testdata[:,0], prediction, c='blue')
-
-                string = "Error = %f" %(error)
-                ax = plot1.axis()
-                x_range = ax[1] - ax[0]
-                y_range = ax[3] - ax[2]
-                if three_d:
-                    plot1.text(ax[0] + (x_range / 10), ax[3] - (y_range / 10), 0, string, fontsize = 12)
-                else:
-                    plot1.text(ax[0] + (x_range / 10), ax[3] - (y_range / 10), string, fontsize = 12)
-
-                plt.show()
-                figure.close()
 
     def plotExpertsPrediction(self, mixtureOfExperts, testdata, testoutput):
         predictions, y = [], []
