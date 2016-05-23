@@ -4,7 +4,7 @@ from scipy import optimize
 
 
 class GaussianGate():
-    def __init__(self, num_experts, dimensions_in, dimensions_out, training_x):
+    def __init__(self, num_experts, dimensions_in, dimensions_out):
         self.alphas = np.random.random( (num_experts, 1) )
         self.sigma = np.random.random( (num_experts, dimensions_in, dimensions_in) )
 

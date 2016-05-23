@@ -7,6 +7,26 @@ from Plotter import Plotter
 from sklearn.preprocessing import PolynomialFeatures
 from FourierFeatures import FourierFeatures
 
+def normalize_data(test, val):
+    dimensions = len(test.shape)
+    mins, maxs = [], []
+    if dimensions == 1:
+        minx = min(test) if min(test) < min(val) else min(val)
+        maxx = max(test) if max(test) > max(val) else max(val)
+        test = (test - minx) / (maxx - minx)
+        val = (val - minx) / (maxx - minx)
+        mins.append( minx )
+        maxs.append( maxx )
+    else:
+        for col in range(test.shape[1]):
+            minx = min(test[:,col]) if min(test[:,col]) < min(val[:,col]) else min(val[:,col])
+            maxx = max(test[:,col]) if max(test[:,col]) > max(val[:,col]) else max(val[:,col])
+            test[:,col] = (test[:,col] - minx) / (maxx - minx) if maxx != minx else 1.0
+            val[:,col] = (val[:,col] - minx) / (maxx - minx) if maxx != minx else 1.0
+            mins.append( minx )
+            maxs.append( maxx )
+    return test, val, np.asarray(mins), np.asarray(maxs)
+
 
 class MixtureOfExperts:
 
@@ -17,12 +37,10 @@ class MixtureOfExperts:
         else:
             if len(feat.shape) > 1:
                 ones = np.ones( (feat.shape[0], 1) )
-                feat = np.append(ones, feat, 1)
+                feat = np.append(ones, feat, axis=1)
             else:
                 ones = np.ones( (1,) )
-                print feat.shape
-                print feat
-                feat = np.append(ones, feat, 1)
+                feat = np.append(ones, feat, axis=0)
         return feat
 
     def _transform_fourier_features(self, feat):
@@ -37,14 +55,17 @@ class MixtureOfExperts:
             return feat
 
 
-    def __init__(self, num_experts, training_x, training_y, poly_degree=1, feat_type="polynomial"):
+    def __init__(self, num_experts, training_x, training_y, test_x, test_y, poly_degree=1, feat_type="polynomial"):
         self.poly_degree = poly_degree
         self.feat_type = feat_type
-        training_x = self.transform_features(training_x)
 
+        self.norm_training_x, self.norm_test_x, self.x_mins, self.x_maxs = normalize_data(training_x, test_x)
+        self.norm_training_y, self.norm_test_y, self.y_mins, self.y_maxs = normalize_data(training_y, test_y)
+
+        training_x = self.transform_features(training_x)
         dimension_in = training_x.shape[1]
         dimension_out = training_y.shape[1]
-        self.gateNet = GaussianGate(num_experts, dimension_in, dimension_out, training_x)
+        self.gateNet = GaussianGate(num_experts, dimension_in, dimension_out)
         self.training_iterations = 0
         self.experts = list()
         self.numExperts = num_experts
@@ -71,42 +92,43 @@ class MixtureOfExperts:
 
         return finalOutput, expertOutputs
 
-    def testMixture(self, xset, yset, recordErrors=False):
+    def testMixture(self, test_x, test_y, recordErrors=False):
 
         finalOutputs = list()
-        xset = self.transform_features(xset)
-        for i, x in enumerate(xset):
+        transformed_test_x = self.transform_features(test_x)
+        for i, x in enumerate(transformed_test_x):
             mixPrediction, expPrediction = self.computeMixtureOutput(x)
             finalOutputs.append( mixPrediction )
 
             ########### Grow netowork ############
             ##### Ramamurti equation 8 ###############
             if isinstance(self.gateNet, GaussianGate) and recordErrors:
-                y = yset[i]
+                y = test_y[i]
                 hs = self.gateNet._compute_hs(self.experts, x, y)
                 for j, expert in enumerate(self.experts):
-                    expert.addError( hs[j], sum((y - expPrediction[:,j])**2) / yset.shape[0] )
+                    expert.addError( hs[j], sum((y - expPrediction[:,j])**2) / test_y.shape[0] )
 
         error = 0
         for i in range(len(finalOutputs)):
-            error += ((yset[i] - finalOutputs[i])**2) / xset.shape[0]
+            error += ((test_y[i] - finalOutputs[i])**2) / transformed_test_x.shape[0]
 
         return error, finalOutputs 
 
 
-    def growNetwork(self, sortedExperts, training_x, training_y, test_x, test_y):
+    def growNetwork(self, sortedExperts):
+        transformed_training_x = self.transform_features(self.norm_training_x)
         for expert in sortedExperts:
             meanBackup = expert.mean().copy()
             alphaBackup = self.gateNet.alphas[expert.index].copy()
             sigmaBackup = self.gateNet.sigma[expert.index].copy()
             weightsBackup = expert.weights.copy()
 
-            newExpert = Expert(training_x.shape[1], training_y.shape[1], expert.location, self.numExperts)
+            newExpert = Expert(self.norm_training_x.shape[1], self.norm_training_y.shape[1], expert.location, self.numExperts)
             newExpert.weights = expert.weights.copy()
 
             ###########Update experts according to Ramamurti page 5######################
             #############################################################################
-            firstMean, secondMean = self.gateNet.find_best_means(expert, training_x, training_y)
+            firstMean, secondMean = self.gateNet.find_best_means(expert, transformed_training_x, self.norm_training_y)
             expert.setMean(firstMean)
             newExpert.setMean(secondMean)
 
@@ -118,7 +140,7 @@ class MixtureOfExperts:
             self.gateNet.sigma = np.vstack( (self.gateNet.sigma, newSigma) )
 
 
-            newMean, oldMean = self.gateNet.weighted_2_means(training_x, training_y, newExpert, expert)
+            newMean, oldMean = self.gateNet.weighted_2_means(transformed_training_x, self.norm_training_y, newExpert, expert)
             newExpert.setMean(newMean)
             expert.setMean(oldMean)
 
@@ -128,8 +150,8 @@ class MixtureOfExperts:
             #################### Test new network ########################################
 
             for i in range(5):
-                self.gateNet.train(training_x, training_y, self.experts)
-                error, prediction = self.testMixture(test_x, test_y)
+                self.gateNet.train( transformed_training_x, self.norm_training_y, self.experts)
+                error, prediction = self.testMixture(self.norm_test_x, self.norm_test_y)
                 avg_error = sum(error) / len(error)
                 if  self.bestError - avg_error > 0.0001:
                     print "Error ", avg_error
@@ -159,18 +181,19 @@ class MixtureOfExperts:
         [e.saveBestWeights() for e in self.experts]
 
 
-    def trainNetwork(self, training_x, training_y, test_x, test_y, maxIterations, growing=False):
-        training_x = self.transform_features(training_x)
+    def trainNetwork(self, maxIterations, growing=False):
         errors = list()
         keepGrowing = True
+        transformed_training_x = self.transform_features(self.norm_training_x)
+
         while keepGrowing:
             iterations = 0
             while True:
 
-                self.gateNet.train(training_x, training_y, self.experts)
+                self.gateNet.train( transformed_training_x, self.norm_training_y, self.experts)
 
                 [e.resetError() for e in self.experts]
-                last_error, prediction = self.testMixture(test_x, test_y, recordErrors=True)
+                last_error, prediction = self.testMixture(self.norm_test_x, self.norm_test_y, recordErrors=True)
                 avg_error = sum(last_error) / len(last_error)
 
                 print "Errors: ", last_error
@@ -196,7 +219,7 @@ class MixtureOfExperts:
 
             if self.bestError < 0.0001:
                 break
-            keepGrowing = False if growing == False else self.growNetwork(errorSorted, training_x, training_y, test_x, test_y)
+            keepGrowing = False if growing == False else self.growNetwork(errorSorted)
         print "Final network %d experts" %(len(self.experts))
 
 
@@ -207,12 +230,12 @@ class MixtureOfExperts:
 
 
 
-    def visualizePredictions(self, trainingdata, trainingoutput, testdata, testoutput):
+    def visualizePredictions(self, training_x, training_y, test_x, test_y, originalFunction=None):
         plotter = Plotter()
-        plotter.plotPrediction(self, trainingdata, trainingoutput, testdata, testoutput)
-        plotter.plotExpertsPrediction(self, testdata, testoutput)
-        plotter.plotExpertsCenters(self, trainingdata, trainingoutput)
-        plotter.plotGaussians(self, trainingdata, trainingoutput)
+        plotter.plotPrediction(self, training_x, training_y, self.norm_test_x, self.norm_test_y, originalFunction)
+        plotter.plotExpertsPrediction(self, test_x, test_y)
+        plotter.plotExpertsCenters(self, training_x, training_y)
+        plotter.plotGaussians(self, training_x, training_y)
 
 
 

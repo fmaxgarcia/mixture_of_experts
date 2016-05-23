@@ -23,31 +23,23 @@ class Plotter:
         return  X, Y, Z
 
 
-    def plotPrediction(self, mixtureOfExperts, trainingdata, trainingoutput, testdata, testoutput):
-        error, prediction = mixtureOfExperts.testMixture(testdata, testoutput)
+    def plotPrediction(self, mixtureOfExperts, training_x, training_y, test_x, test_y, originalFunction=None):
+        error, prediction = mixtureOfExperts.testMixture(test_x, test_y)
         figure = plt.figure()
-        three_d = False if trainingdata.shape[1] == 1 else True
-        #plot1 = figure.add_subplot(111, projection='3d') if three_d else figure.add_subplot(111)
-        plot2 = figure.add_subplot(111, projection='3d') if three_d else figure.add_subplot(111)
+        three_d = False if training_x.shape[1] == 1 else True
+        plot1 = figure.add_subplot(111, projection='3d') if three_d else figure.add_subplot(111)
         cmap = colormaps()
 
         if three_d:
-            xdat = sorted(trainingdata[:,0])
-            ydat = sorted(trainingdata[:,1], reverse=True)
+            xdat = sorted(training_x[:,0])
+            ydat = sorted(training_x[:,1], reverse=True)
             X, Y = np.meshgrid(xdat, ydat)
 
-            #Quadratic
-            #Z = np.log((-2*(X-5)**2 + 50) + (-2*(Y-5)**2 + 50))
-
-            #Peaks
-            Z = 3*(1-X)**2*np.exp(-X**2 - (Y+1)**2) - 10*(X/5 - X**3 - Y**5) * np.exp(-X**2 - Y**2) - (1/3)*np.exp(-(X+1)**2 - Y**2)
-            #plot1.plot_surface(X, Y, Z, cmap=cmap[3])
-
-            xt, yt, zt = self._create3Dmesh(testdata[:,0], testdata[:,1], mixtureOfExperts)
-            plot2.plot_surface(xt, yt, zt, cmap=cmap[7])
+            xt, yt, zt = self._create3Dmesh(test_x[:,0], test_x[:,1], mixtureOfExperts)
+            plot1.plot_surface(xt, yt, zt, cmap=cmap[7])
         else:
-            plot1.scatter(trainingdata[:,0], trainingoutput, c="red")
-            plot2.scatter(testdata[:,0], prediction, c='blue')
+            plot1.scatter(training_x[:,0], training_y, c="red")
+            plot2.scatter(test_x[:,0], prediction, c='blue')
 
         string = "Error = %f" %(error)
         ax = plot2.axis()

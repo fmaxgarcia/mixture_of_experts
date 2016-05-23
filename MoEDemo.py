@@ -91,23 +91,12 @@ def readFile(filename):
 ################################################
 
 
-def normalize_data(test, val):
-    dimensions = len(test.shape)
-    if dimensions == 1:
-        minx = min(test) if min(test) < min(val) else min(val)
-        maxx = max(test) if max(test) > max(val) else max(val)
-        test = (test - minx) / (maxx - minx)
-        val = (val - minx) / (maxx - minx)
-    else:
-        for col in range(test.shape[1]):
-            minx = min(test[:,col]) if min(test[:,col]) < min(val[:,col]) else min(val[:,col])
-            maxx = max(test[:,col]) if max(test[:,col]) > max(val[:,col]) else max(val[:,col])
-            test[:,col] = (test[:,col] - minx) / (maxx - minx) if maxx != minx else 1.0
-            val[:,col] = (val[:,col] - minx) / (maxx - minx) if maxx != minx else 1.0
-    return test, val
 
+def function2Dcompare(X, Y):
+    return np.log((-2*(X-5)**2 + 50) + (-2*(Y-5)**2 + 50))
 
-
+def functionPeaksCompare(X, Y):
+    return 3*(1-X)**2*np.exp(-X**2 - (Y+1)**2) - 10*(X/5 - X**3 - Y**5) * np.exp(-X**2 - Y**2) - (1/3)*np.exp(-(X+1)**2 - Y**2)
 
 if __name__ == '__main__':
     #Options to run from command line
@@ -130,37 +119,31 @@ if __name__ == '__main__':
     training_y = out[30:170:1] if options.train is None else out
     training_x = data[30:170:1] if options.train is None else data
 
-    testdata, actualOutput = [], []
+    test_x, test_y = [], []
     if options.test is None:
         idx = range(30) + range(170,200)
-        testdata = data[idx]
-        actualOutput = out[idx]
+        test_x = data[idx]
+        test_y = out[idx]
     else:
-        testdata, actualOutput = readFile(options.test)
+        test_x, test_y = readFile(options.test)
 
-    ####Normalize test and validation data together###########
-    ###########################################################
-
-    training_x, testdata = normalize_data(training_x, testdata)
-    training_y, actualOutput = normalize_data(training_y, actualOutput)
 
     ########################################################
     #Reshape
     if len(training_y.shape) == 1:
         training_y.shape = (len(training_y), 1)
-        actualOutput.shape = (len(actualOutput), 1)
+        test_y.shape = (len(test_y), 1)
 
     if len(training_x.shape) == 1:
         training_x.shape = (len(training_x), 1)
-        testdata.shape = (len(testdata), 1)
+        test_x.shape = (len(test_x), 1)
 
     #######################################################
 
     #Create mix of experts and set up hyper-params
-    mixExperts = MixtureOfExperts(num_experts, training_x, training_y, poly_degree=1, feat_type="polynomial")
+    mixExperts = MixtureOfExperts(num_experts, training_x, training_y, test_x, test_y, poly_degree=1, feat_type="polynomial")
 
     #Train network and returns intermediate states for vizualisation
-    mixExperts.trainNetwork(training_x, training_y, testdata, actualOutput, maxIterations, growing=False)
-
+    mixExperts.trainNetwork(maxIterations, growing=False)
     mixExperts.setToBestParams()
-    mixExperts.visualizePredictions(training_x, training_y, testdata, actualOutput)
+    # mixExperts.visualizePredictions(training_x, training_y, test_x, test_y, originalFunction=function2Dcompare)
