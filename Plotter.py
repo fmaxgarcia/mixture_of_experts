@@ -15,7 +15,7 @@ class Plotter:
         Z = np.zeros( X.shape )
         for i in range(X.shape[0]):
             for j in range(X.shape[0]):
-                xy = mixtureOfExperts.transform_features(np.asarray([X[i][j], Y[i][j]]))
+                xy = np.asarray([X[i][j], Y[i][j]])
                 finalOutput, expertsOutputs = mixtureOfExperts.computeMixtureOutput( xy )
                 if output_index > -1:
                     finalOutput = finalOutput[output_index]

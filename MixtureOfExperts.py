@@ -4,8 +4,6 @@ from GaussianGate import GaussianGate
 from Expert import Expert
 from Plotter import Plotter
 
-from sklearn.preprocessing import PolynomialFeatures
-from FourierFeatures import FourierFeatures
 
 def normalize_data(test, val):
     dimensions = len(test.shape)
@@ -30,30 +28,6 @@ def normalize_data(test, val):
 
 class MixtureOfExperts:
 
-    def _transform_poly_features(self, feat):
-        if self.poly_degree > 1:
-            polynomial = PolynomialFeatures(self.poly_degree)
-            feat = polynomial.fit_transform(feat)
-        else:
-            if len(feat.shape) > 1:
-                ones = np.ones( (feat.shape[0], 1) )
-                feat = np.append(ones, feat, axis=1)
-            else:
-                ones = np.ones( (1,) )
-                feat = np.append(ones, feat, axis=0)
-        return feat
-
-    def _transform_fourier_features(self, feat):
-        return FourierFeatures(self.poly_degree, feat)
-
-    def transform_features(self, feat):
-        if self.feat_type == "polynomial":
-            return  self._transform_poly_features(feat)
-        elif self.feat_type == "fourier":
-            return self._transform_fourier_features(feat)
-        else:
-            return feat
-
 
     def __init__(self, num_experts, training_x, training_y, test_x, test_y, poly_degree=1, feat_type="polynomial"):
         self.poly_degree = poly_degree
@@ -62,7 +36,6 @@ class MixtureOfExperts:
         self.norm_training_x, self.norm_test_x, self.x_mins, self.x_maxs = normalize_data(training_x, test_x)
         self.norm_training_y, self.norm_test_y, self.y_mins, self.y_maxs = normalize_data(training_y, test_y)
 
-        training_x = self.transform_features(training_x)
         dimension_in = training_x.shape[1]
         dimension_out = training_y.shape[1]
         self.gateNet = GaussianGate(num_experts, dimension_in, dimension_out)
@@ -79,7 +52,7 @@ class MixtureOfExperts:
                 step = (maxx - minx) / num_experts
                 location[j] = (minx + step/2) + step * i
 
-            self.experts.append( Expert(dimension_in, dimension_out, location, i) )
+            self.experts.append( Expert(training_x, training_y, location, i, poly_degree=poly_degree, feat_type=feat_type   ) )
 
     def computeExpertsOutputs(self, x):
         return np.array([e.computeExpertyhat(x) for e in self.experts]).T
@@ -95,7 +68,7 @@ class MixtureOfExperts:
     def testMixture(self, test_x, test_y, recordErrors=False):
 
         finalOutputs = list()
-        transformed_test_x = self.transform_features(test_x)
+        transformed_test_x = test_x
         for i, x in enumerate(transformed_test_x):
             mixPrediction, expPrediction = self.computeMixtureOutput(x)
             finalOutputs.append( mixPrediction )
@@ -116,60 +89,61 @@ class MixtureOfExperts:
 
 
     def growNetwork(self, sortedExperts):
-        transformed_training_x = self.transform_features(self.norm_training_x)
+        transformed_training_x = self.norm_training_x
         for expert in sortedExperts:
             meanBackup = expert.mean().copy()
             alphaBackup = self.gateNet.alphas[expert.index].copy()
-            sigmaBackup = self.gateNet.sigma[expert.index].copy()
+            sigmaBackup = expert.sigma.copy()
             weightsBackup = expert.weights.copy()
 
-            newExpert = Expert(self.norm_training_x.shape[1], self.norm_training_y.shape[1], expert.location, self.numExperts)
-            newExpert.weights = expert.weights.copy()
+            for pol_degree in range(1, 4):
+                print "Testing degree ", pol_degree
+                newExpert = Expert(self.norm_training_x, self.norm_training_y, expert.location, self.numExperts, poly_degree=pol_degree)
+                newExpert.setWeights( expert.weights.copy() )
 
-            ###########Update experts according to Ramamurti page 5######################
-            #############################################################################
-            firstMean, secondMean = self.gateNet.find_best_means(expert, transformed_training_x, self.norm_training_y)
-            expert.setMean(firstMean)
-            newExpert.setMean(secondMean)
+                ###########Update experts according to Ramamurti page 5######################
+                #############################################################################
+                firstMean, secondMean = self.gateNet.find_best_means(expert, transformed_training_x, self.norm_training_y)
+                expert.setMean(firstMean)
+                newExpert.setMean(secondMean)
 
-            newAlpha =  np.array([alphaBackup / 2.0])
-            self.gateNet.alphas = np.vstack( (self.gateNet.alphas, newAlpha) )
-            self.gateNet.alphas[expert.index] /= 2.0
+                newAlpha =  np.array([alphaBackup / 2.0])
+                self.gateNet.alphas = np.vstack( (self.gateNet.alphas, newAlpha) )
+                self.gateNet.alphas[expert.index] /= 2.0
 
-            newSigma = np.array( [sigmaBackup] )
-            self.gateNet.sigma = np.vstack( (self.gateNet.sigma, newSigma) )
-
-
-            newMean, oldMean = self.gateNet.weighted_2_means(transformed_training_x, self.norm_training_y, newExpert, expert)
-            newExpert.setMean(newMean)
-            expert.setMean(oldMean)
+                newSigma = sigmaBackup
+                expert.sigma = newSigma
 
 
-            self.experts.append(newExpert)
-            ##############################################################################
-            #################### Test new network ########################################
+                newMean, oldMean = self.gateNet.weighted_2_means(transformed_training_x, self.norm_training_y, newExpert, expert)
+                newExpert.setMean(newMean)
+                expert.setMean(oldMean)
 
-            for i in range(5):
-                self.gateNet.train( transformed_training_x, self.norm_training_y, self.experts)
-                error, prediction = self.testMixture(self.norm_test_x, self.norm_test_y)
-                avg_error = sum(error) / len(error)
-                if  self.bestError - avg_error > 0.0001:
-                    print "Error ", avg_error
-                    print "Errors: ", error
-                    self._saveParameters(avg_error)
-                    self.numExperts += 1
-                    print "Adding new expert!"
-                    return True
 
-            ###### Revert to previous network########
-            expert.setMean(meanBackup)
-            expert.weights = weightsBackup
-            self.gateNet.alphas[expert.index] = alphaBackup
-            self.gateNet.sigma[expert.index] = sigmaBackup
-            self.experts.remove(newExpert)
-            self.gateNet.sigma = np.delete(self.gateNet.sigma, self.numExperts, 0)
-            self.gateNet.alphas = np.delete(self.gateNet.alphas, self.numExperts, 0)
-            print "Reversing to previous network"
+                self.experts.append(newExpert)
+                ##############################################################################
+                #################### Test new network ########################################
+
+                for i in range(5):
+                    self.gateNet.train( transformed_training_x, self.norm_training_y, self.experts)
+                    error, prediction = self.testMixture(self.norm_test_x, self.norm_test_y)
+                    avg_error = sum(error) / len(error)
+                    if  self.bestError - avg_error > 0.0001:
+                        print "Error ", avg_error
+                        print "Errors: ", error
+                        self._saveParameters(avg_error)
+                        self.numExperts += 1
+                        print "Adding new expert!"
+                        return True
+
+                ###### Revert to previous network########
+                expert.setMean(meanBackup)
+                expert.weights = weightsBackup
+                self.gateNet.alphas[expert.index] = alphaBackup
+                expert.sigma = sigmaBackup
+                self.experts.remove(newExpert)
+                self.gateNet.alphas = np.delete(self.gateNet.alphas, self.numExperts, 0)
+                print "Reversing to previous network"
 
         return False
 
@@ -184,7 +158,7 @@ class MixtureOfExperts:
     def trainNetwork(self, maxIterations, growing=False):
         errors = list()
         keepGrowing = True
-        transformed_training_x = self.transform_features(self.norm_training_x)
+        transformed_training_x = self.norm_training_x
 
         while keepGrowing:
             iterations = 0

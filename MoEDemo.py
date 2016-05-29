@@ -194,6 +194,6 @@ if __name__ == '__main__':
     mixExperts = MixtureOfExperts(num_experts, training_x, training_y, test_x, test_y, poly_degree=1, feat_type="polynomial")
 
     #Train network and returns intermediate states for vizualisation
-    mixExperts.trainNetwork(maxIterations, growing=False)
+    mixExperts.trainNetwork(maxIterations, growing=True)
     mixExperts.setToBestParams()
     mixExperts.visualizePredictions(training_x, training_y, test_x, test_y)
