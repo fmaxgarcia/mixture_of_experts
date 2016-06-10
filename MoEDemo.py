@@ -159,7 +159,7 @@ if __name__ == '__main__':
 
     (options, args) = parser.parse_args()
 
-    data, out = createData2D2() if options.train is None else readFile(options.train)
+    data, out = createData2D() if options.train is None else readFile(options.train)
 
     num_experts = 2 if options.num is None else options.num
     maxIterations = 100 if options.iter is None else options.iter

@@ -89,7 +89,8 @@ class MixtureOfExperts:
 
 
     def growNetwork(self, sortedExperts):
-        transformed_training_x = self.norm_training_x
+
+
         for expert in sortedExperts:
             meanBackup = expert.mean().copy()
             alphaBackup = self.gateNet.alphas[expert.index].copy()
@@ -101,9 +102,10 @@ class MixtureOfExperts:
                 newExpert = Expert(self.norm_training_x, self.norm_training_y, expert.location, self.numExperts, poly_degree=pol_degree)
                 newExpert.setWeights( expert.weights.copy() )
 
+
                 ###########Update experts according to Ramamurti page 5######################
                 #############################################################################
-                firstMean, secondMean = self.gateNet.find_best_means(expert, transformed_training_x, self.norm_training_y)
+                firstMean, secondMean = self.gateNet.find_best_means(expert, self.norm_training_x, self.norm_training_y)
                 expert.setMean(firstMean)
                 newExpert.setMean(secondMean)
 
@@ -115,7 +117,7 @@ class MixtureOfExperts:
                 expert.sigma = newSigma
 
 
-                newMean, oldMean = self.gateNet.weighted_2_means(transformed_training_x, self.norm_training_y, newExpert, expert)
+                newMean, oldMean = self.gateNet.weighted_2_means(self.norm_training_x, self.norm_training_y, newExpert, expert)
                 newExpert.setMean(newMean)
                 expert.setMean(oldMean)
 
@@ -125,7 +127,7 @@ class MixtureOfExperts:
                 #################### Test new network ########################################
 
                 for i in range(5):
-                    self.gateNet.train( transformed_training_x, self.norm_training_y, self.experts)
+                    self.gateNet.train( self.norm_training_x, self.norm_training_y, self.experts)
                     error, prediction = self.testMixture(self.norm_test_x, self.norm_test_y)
                     avg_error = sum(error) / len(error)
                     if  self.bestError - avg_error > 0.0001:

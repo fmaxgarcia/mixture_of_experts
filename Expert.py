@@ -37,7 +37,7 @@ class Expert:
         self.feat_type = feat_type
         _training_x = self.transform_features(training_x)
         self.weights = np.random.random( (training_y.shape[1], _training_x.shape[1]) )
-        self.sigma = np.identity(_training_x.shape[1]) / 1000.0
+        self.sigma = np.identity(_training_x.shape[1]) / 100.0
         self.dim_input = _training_x.shape[1]
         self.dim_output = training_y.shape[1]
 
@@ -46,7 +46,7 @@ class Expert:
             location = np.vstack( (location, np.zeros((int(diff), 1))) )
         elif location.shape[0] > _training_x.shape[1]:
             for i in range(int(diff)):
-                location = np.delete(location, location.shape[1], 0)
+                location = np.delete(location, location.shape[1]-1, 0)
 
         self.location = location
         for i in range(training_y.shape[1]):
@@ -69,7 +69,7 @@ class Expert:
         diff = math.fabs(weights.shape[1] - self.weights.shape[1])
         if weights.shape[1] > self.weights.shape[1]:
             for i in range(int(diff)):
-                weights = np.delete(weights, weights.shape[1], 1)
+                weights = np.delete(weights, weights.shape[1]-1, 1)
         elif weights.shape[1] < self.weights.shape[1]:
             weights = np.hstack( (weights, np.random.random((self.dim_output, int(diff)))) )
 
@@ -84,7 +84,7 @@ class Expert:
         diff = math.fabs(loc.shape[0] - self.location.shape[0])
         if loc.shape[0] > self.location.shape[0]:
             for i in range(int(diff)):
-                loc = np.delete(loc, loc.shape[1], 0)
+                loc = np.delete(loc, loc.shape[1]-1, 0)
         elif loc.shape[0] < self.location.shape[0]:
             loc = np.vstack( (loc, np.random.random((int(diff), 1))) )
 
@@ -111,6 +111,9 @@ class Expert:
         result = self.weights.dot( x.T )
         if len(result.shape) == 2: #when last dimension is 1
             result = result.reshape( (result.shape[0],) )
+        if math.isnan(result[0]):
+            print "Exception: X ", x, "\nWeights ", self.weights, "\nResult ", result
+            raise
         return result
 
     def saveBestWeights(self):
